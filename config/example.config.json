@@ -1,0 +1,22 @@
+{
+  "services": [
+    {
+      "name": "default",
+      "apiToken": "someSecretToken",
+      "bot": {
+        "adapterName": "telegram",
+        "botToken": "telegramBotId"
+      },
+      "source": {
+        "adapterName": "opengtin",
+        "userid": "opengtinUserId"
+      },
+      "list": {
+        "adapterName": "bring",
+        "username": "bringUsername",
+        "password": "bringPassword",
+        "listId": "bringListId"
+      }
+    }
+  ]
+}

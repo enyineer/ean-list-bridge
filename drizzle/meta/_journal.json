@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1750716673989,
+      "tag": "0000_ancient_scrambler",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1750720819043,
+      "tag": "0001_light_orphan",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1750721260059,
+      "tag": "0002_sour_quicksilver",
+      "breakpoints": true
+    }
+  ]
+}

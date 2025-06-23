@@ -1,0 +1,1 @@
+ALTER TABLE `ean_cache` ADD `manual` integer NOT NULL;
