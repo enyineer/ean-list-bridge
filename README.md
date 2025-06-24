@@ -41,6 +41,9 @@ There might be new Adapters in the future. Please see the README of the adapter 
 
 This repository contains a Dockerfile for you to build this application locally and start it as a Docker Container without needing to install Bun.
 
+### Prebuilt Image
+
+You can get a prebuilt image from Dockerhub: [nicoenking/ean-list-bridge](https://hub.docker.com/r/nicoenking/ean-list-bridge)
 
 ### Create Image
 
