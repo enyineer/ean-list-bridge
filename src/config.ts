@@ -21,3 +21,15 @@ const file = Bun.file(path);
 const contents = await file.json();
 
 export const config = await configSchema.parseAsync(contents);
+
+export function getServiceConfig(serviceName: string) {
+  const serviceConfig = config.services.find(
+    (e) => e.serviceName === serviceName
+  );
+
+  if (serviceConfig === undefined) {
+    throw new Error(`No service with name ${serviceName} configured`);
+  }
+
+  return serviceConfig;
+}

@@ -2,45 +2,63 @@ import { and, eq, gt, or } from "drizzle-orm";
 import type { AdapterBaseConfig } from "./adapterBase";
 import { getAdapter } from "./adapterRegistry";
 import type { BotAdapter } from "./botAdapters/interface";
-import { config, type ServiceConfig } from "./config";
+import { config, getServiceConfig, type ServiceConfig } from "./config";
 import { db } from "./db";
 import type { ListAdapter } from "./listAdapters/interface";
 import type { Product } from "./product";
 import { eanCache } from "./schema";
 import type { SourceAdapter } from "./sourceAdapters/interface";
+import { checkToken } from "./authentication";
 
 export async function setup() {
   // Call setup function for all bots defined in all services
   for (const service of config.services) {
-    // Get adapter for this bot's service
-    const adapter = getAdapter<BotAdapter<AdapterBaseConfig>>(
-      service.bot.adapterName,
-      "bot"
-    );
-    // Make sure this configuration actually adheres to the adapters config schema
-    const config = await adapter.getConfigDataSchema().parseAsync(service.bot);
-    // Start bot
-    console.log(
-      `Starting bot of type ${service.bot.adapterName} for service ${service.serviceName}`
-    );
-    await adapter.start(config);
-    console.log(
-      `Successfully started bot of type ${service.bot.adapterName} for service ${service.serviceName}`
-    );
-
-    // TODO: Add listeners for incoming updates and add product + update cache as manual item
+    await setupBots(service);
   }
+}
+
+async function setupBots(service: ServiceConfig) {
+  // Get adapter for this services bot
+  const adapter = getAdapter<BotAdapter<AdapterBaseConfig>>(
+    service.bot.adapterName,
+    "bot"
+  );
+  // Make sure this configuration actually adheres to the adapters config schema
+  const config = await adapter.getConfigDataSchema().parseAsync(service.bot);
+  // Start bot
+  console.log(
+    `Starting bot of type ${service.bot.adapterName} for service ${service.serviceName}`
+  );
+  await adapter.start(config);
+  console.log(
+    `Successfully started bot of type ${service.bot.adapterName} for service ${service.serviceName}`
+  );
+
+  // TODO: Add listeners for incoming updates and add product + update cache as manual item
+}
+
+async function setupAPI(service: ServiceConfig) {
+  Bun.serve({
+    routes: {
+      "/api/v1/service/:serviceName/scan": {
+        POST: async (req) => {
+          const serviceName = req.params.serviceName;
+
+          if (!checkToken(serviceName, req)) {
+            return Response.json({ message: "Invalid token" }, { status: 403 });
+          }
+
+          const body = await req.json();
+          return Response.json({ created: true });
+        },
+      },
+    },
+  });
 }
 
 // This function should be called when an ean is scanned for a specific service
 export async function scan(serviceName: string, ean: string) {
-  const serviceConfig = config.services.find(
-    (e) => e.serviceName === serviceName
-  );
-
-  if (serviceConfig === undefined) {
-    throw new Error(`No service with name ${serviceName} configured`);
-  }
+  const serviceConfig = getServiceConfig(serviceName);
 
   // Get all necessary configs for this service
   const sourceConfig = serviceConfig.source;
