@@ -24,6 +24,7 @@ type TelegramAdapterConfig = z.infer<typeof telegramAdapterConfigSchema>;
 
 class TelegramAdapter implements BotAdapter<TelegramAdapterConfig> {
   private addCommandRegEx = new RegExp(/^\/add (\d{8,13})$/);
+  private instances: Bot<ConversationFlavor<Context>>[] = [];
 
   getAddCommandExample(ean: string) {
     return `\`/add ${ean}\``;
@@ -171,6 +172,8 @@ class TelegramAdapter implements BotAdapter<TelegramAdapterConfig> {
     bot.catch((err) => logger.error(`Bot error: ${JSON.stringify(err)}`));
 
     bot.start();
+
+    this.instances.push(bot);
   }
   async sendMessage(
     message: string,
@@ -187,6 +190,11 @@ class TelegramAdapter implements BotAdapter<TelegramAdapterConfig> {
   }
   getConfigDataSchema() {
     return telegramAdapterConfigSchema;
+  }
+  async onShutdown(): Promise<void> {
+    for (const instance of this.instances) {
+      await instance.stop();
+    }
   }
 }
 

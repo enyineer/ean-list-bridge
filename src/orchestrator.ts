@@ -99,7 +99,7 @@ async function setupAPI(serverPort: number) {
 
   logger.debug("Starting API server...");
 
-  Bun.serve({
+  const server = Bun.serve({
     port: serverPort,
     routes: {
       "/api/v1/service/:serviceName/scan": {
@@ -172,6 +172,13 @@ async function setupAPI(serverPort: number) {
   });
 
   logger.debug("Successfully started API server");
+
+  // Listen for the Docker‐stop SIGTERM
+  process.on("SIGTERM", async () => {
+    logger.info("SIGTERM received, shutting down API Server");
+    await server.stop(); // stops accepting new connections
+    logger.info("Server has shut down cleanly");
+  });
 }
 
 // This function should be called when an ean is scanned for a specific service

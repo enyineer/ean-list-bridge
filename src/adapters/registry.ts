@@ -92,3 +92,28 @@ export async function getAdapter<T extends AdapterBase<AdapterBaseConfig>>(
 
   return adapter;
 }
+
+// Listen for the Docker‐stop SIGTERM
+process.on("SIGTERM", async () => {
+  logger.info("SIGTERM received, shutting down Registry");
+
+  for (const [_key, value] of Object.entries(sourceAdapterRegistry)) {
+    if (value.onShutdown) {
+      await value.onShutdown();
+    }
+  }
+
+  for (const [_key, value] of Object.entries(listAdapterRegistry)) {
+    if (value.onShutdown) {
+      await value.onShutdown();
+    }
+  }
+
+  for (const [_key, value] of Object.entries(botAdapterRegistry)) {
+    if (value.onShutdown) {
+      await value.onShutdown();
+    }
+  }
+
+  logger.info("Registry has shut down cleanly");
+});

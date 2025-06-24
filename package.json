@@ -24,6 +24,7 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "cross-env NODE_ENV=development bun run --watch src/index.ts",
+    "build": "tsc",
     "generate": "drizzle-kit generate --dialect sqlite --schema ./src/schema.ts"
   }
 }

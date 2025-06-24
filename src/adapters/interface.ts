@@ -15,4 +15,8 @@ export interface AdapterBase<C extends AdapterBaseConfig> {
    * Should return the adapters specific ConfigDataSchema. This is used in the registry to make sure that a config is valid for a configured adapter.
    */
   getConfigDataSchema(): ZodType<C>;
+  /**
+   * Is being called when the server is shutting down
+   */
+  onShutdown?(): Promise<void>;
 }
