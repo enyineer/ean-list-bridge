@@ -22,3 +22,7 @@ Connects to the Telegram Bot API to send and receive messages regarding scanned 
 ### Start Bot
 
 Open the Chat with your Bot after it's created and after you have started the application and run /start once so the Bot can send messages to this chat.
+
+#### Privacy Settings
+
+Make sure to disable Group Privacy in Botfathers Bot Settings for your Bot if you want to use it in a Group. Otherwise it will not be able to read your messages.
