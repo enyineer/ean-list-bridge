@@ -1,19 +1,20 @@
 {
   "services": [
     {
-      "name": "default",
+      "serviceName": "default",
       "apiToken": "someSecretToken",
       "bot": {
         "adapterName": "telegram",
-        "botToken": "telegramBotId"
+        "botToken": "telegramBotToken",
+        "chatId": "telegramChatId"
       },
       "source": {
-        "adapterName": "opengtin",
+        "adapterName": "opengtindb",
         "userid": "opengtinUserId"
       },
       "list": {
         "adapterName": "bring",
-        "username": "bringUsername",
+        "email": "bringEmail",
         "password": "bringPassword",
         "listId": "bringListId"
       }

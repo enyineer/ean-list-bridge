@@ -1,12 +1,14 @@
 import { Glob } from "bun";
 import { join } from "path";
-import type { AdapterBase, AdapterBaseConfig } from "./adapterBase";
+import type { AdapterBase, AdapterBaseConfig } from "./interface";
+import type { ServiceConfig } from "../config";
+import { logger } from "../logger";
 
-const listAdaptersGlob = new Glob("listAdapters/*.adapter.ts");
-const sourceAdaptersGlob = new Glob("sourceAdapters/*.adapter.ts");
-const botAdaptersGlob = new Glob("botAdapters/*.adapter.ts");
+const listAdaptersGlob = new Glob("list/**/*.adapter.ts");
+const sourceAdaptersGlob = new Glob("source/**/*.adapter.ts");
+const botAdaptersGlob = new Glob("bot/**/*.adapter.ts");
 
-const cwd = "./src";
+const cwd = "./src/adapters";
 
 type AdapterRegistry = Record<string, AdapterBase<AdapterBaseConfig>>;
 
@@ -21,7 +23,7 @@ async function addAdapter(path: string, registry: AdapterRegistry) {
 
   const adapterName = instance.getAdapterName();
 
-  console.log(`Registering adapter ${adapterName} (${path})...`);
+  logger.debug(`Registering adapter ${adapterName}...`);
 
   if (Object.hasOwn(registry, adapterName)) {
     throw new Error(`Duplicate adapter name ${adapterName} (${path}).`);
@@ -29,39 +31,47 @@ async function addAdapter(path: string, registry: AdapterRegistry) {
 
   registry[adapterName] = instance;
 
-  console.log(`Successfully registered adapter ${adapterName} ${path}`);
+  logger.debug(`Successfully registered adapter ${adapterName}`);
 }
 
 // Scan listAdapters for all adapters
 for await (const file of listAdaptersGlob.scan({ cwd })) {
-  await addAdapter(join(cwd, file), listAdapterRegistry);
+  await addAdapter(`./${file}`, listAdapterRegistry);
 }
 
 // Scan sourceAdapters for all adapters
 for await (const file of sourceAdaptersGlob.scan({ cwd })) {
-  await addAdapter(join(cwd, file), sourceAdapterRegistry);
+  await addAdapter(`./${file}`, sourceAdapterRegistry);
 }
 
 // Scan botAdapters for all adapters
 for await (const file of botAdaptersGlob.scan({ cwd })) {
-  await addAdapter(join(cwd, file), botAdapterRegistry);
+  await addAdapter(`./${file}`, botAdapterRegistry);
 }
 
-export function getAdapter<T extends AdapterBase<AdapterBaseConfig>>(
-  adapterName: string,
-  registryType: "source" | "list" | "bot"
+export async function getAdapter<T extends AdapterBase<AdapterBaseConfig>>(
+  registryType: "source" | "list" | "bot",
+  serviceConfig: ServiceConfig
 ) {
   let registry: AdapterRegistry;
+  let config: AdapterBaseConfig;
+  let adapterName: string;
 
   switch (registryType) {
     case "list":
       registry = listAdapterRegistry;
+      config = serviceConfig.list;
+      adapterName = serviceConfig.list.adapterName;
       break;
     case "source":
       registry = sourceAdapterRegistry;
+      config = serviceConfig.source;
+      adapterName = serviceConfig.source.adapterName;
       break;
     case "bot":
       registry = botAdapterRegistry;
+      config = serviceConfig.bot;
+      adapterName = serviceConfig.bot.adapterName;
       break;
     default:
       throw new Error(
@@ -75,5 +85,10 @@ export function getAdapter<T extends AdapterBase<AdapterBaseConfig>>(
     );
   }
 
-  return registry[adapterName] as T;
+  const adapter = registry[adapterName] as T;
+
+  // Check if services adapter config adheres to it's config schema
+  await adapter.getConfigDataSchema().parseAsync(config);
+
+  return adapter;
 }

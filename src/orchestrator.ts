@@ -1,55 +1,106 @@
 import { and, eq, gt, or } from "drizzle-orm";
-import type { AdapterBaseConfig } from "./adapterBase";
-import { getAdapter } from "./adapterRegistry";
-import type { BotAdapter } from "./botAdapters/interface";
+import { getAdapter } from "./adapters/registry";
+import type {
+  BotAdapter,
+  BotAdapterBaseConfig,
+  BotAddEvent,
+  BotStartEvent,
+  BotUpdateFnReturnValue,
+} from "./adapters/bot/interface";
 import { config, getServiceConfig, type ServiceConfig } from "./config";
 import { db } from "./db";
-import type { ListAdapter } from "./listAdapters/interface";
+import type {
+  ListAdapter,
+  ListAdapterBaseConfig,
+} from "./adapters/list/interface";
 import type { Product } from "./product";
 import { eanCache } from "./schema";
-import type { SourceAdapter } from "./sourceAdapters/interface";
+import type {
+  SourceAdapter,
+  SourceAdapterBaseConfig,
+} from "./adapters/source/interface";
 import { checkToken } from "./authentication";
 import z from "zod/v4";
+import { validateEAN } from "./validation";
+import { logger } from "./logger";
 
-export async function setup() {
+export async function setup(serverPort: number) {
   // Setup API
-  await setupAPI();
+  await setupAPI(serverPort);
   // Call setup function for all bots defined in all services
   for (const service of config.services) {
-    await setupBots(service);
+    await setupServiceBot(service);
   }
 }
 
-async function setupBots(service: ServiceConfig) {
+async function setupServiceBot(serviceConfig: ServiceConfig) {
   // Get adapter for this services bot
-  const adapter = getAdapter<BotAdapter<AdapterBaseConfig>>(
-    service.bot.adapterName,
-    "bot"
+  const adapter = await getAdapter<BotAdapter<BotAdapterBaseConfig>>(
+    "bot",
+    serviceConfig
   );
-  // Make sure this configuration actually adheres to the adapters config schema
-  const config = await adapter.getConfigDataSchema().parseAsync(service.bot);
   // Start bot
-  console.log(
-    `Starting bot of type ${service.bot.adapterName} for service ${service.serviceName}`
+  logger.debug(
+    `Starting bot of type ${adapter.getAdapterName()} for service ${
+      serviceConfig.serviceName
+    }`
   );
-  await adapter.start(config);
-  console.log(
-    `Successfully started bot of type ${service.bot.adapterName} for service ${service.serviceName}`
+  await adapter.start(serviceConfig.bot, async (event) => {
+    switch (event.type) {
+      case "add":
+        return await handleBotAddEvent(event, serviceConfig);
+      case "start":
+        return await handleBotStartEvent(event, serviceConfig);
+      default:
+        throw new Error(`Bot event type ${event} not implemented`);
+    }
+  });
+  logger.debug(
+    `Successfully started bot of type ${adapter.getAdapterName()} for service ${
+      serviceConfig.serviceName
+    }`
   );
-
-  // TODO: Add listeners for incoming updates and add product + update cache as manual item
-  // TODO: Make sure to check if the originating chat is equal to the chat configured for the services bot adapter
 }
 
-async function setupAPI() {
+async function handleBotStartEvent(
+  _event: BotStartEvent,
+  serviceConfig: ServiceConfig
+): BotUpdateFnReturnValue {
+  return {
+    message: `Welcome to the EAN Shopping List Bot! This bot let's you add missing EANs to your EAN-List-Bridge (${serviceConfig.serviceName}) interactively and informs you about products added to your lists.`,
+  };
+}
+
+async function handleBotAddEvent(
+  event: BotAddEvent,
+  serviceConfig: ServiceConfig
+): BotUpdateFnReturnValue {
+  const { data } = event;
+
+  try {
+    await addProduct(data.product, serviceConfig);
+    await updateCache(data.product, true, serviceConfig);
+  } catch (err) {
+    if (err instanceof Error) {
+      return {
+        message: `An error occured while trying to save your new product: ${err.message}`,
+      };
+    }
+    throw err;
+  }
+
+  return null;
+}
+
+async function setupAPI(serverPort: number) {
   const scanBodySchema = z.object({
     ean: z.string(),
   });
 
-  console.log("Starting API server...");
+  logger.debug("Starting API server...");
 
   Bun.serve({
-    port: 3000,
+    port: serverPort,
     routes: {
       "/api/v1/service/:serviceName/scan": {
         POST: async (req) => {
@@ -59,9 +110,29 @@ async function setupAPI() {
             return Response.json({ message: "Invalid auth" }, { status: 403 });
           }
 
-          const body = await scanBodySchema.safeParseAsync(await req.json());
+          let rawBody: unknown;
+          try {
+            rawBody = await req.json();
+          } catch (err) {
+            logger.debug(
+              `[${serviceName}] Received invalid JSON Body: ${JSON.stringify(
+                err
+              )}`
+            );
+            return Response.json(
+              { message: "Invalid JSON body" },
+              { status: 400 }
+            );
+          }
+
+          const body = await scanBodySchema.safeParseAsync(rawBody);
 
           if (!body.success) {
+            logger.debug(
+              `[${serviceName}] Received invalid JSON data: ${JSON.stringify(
+                z.treeifyError(body.error)
+              )}`
+            );
             return Response.json(
               {
                 message: "Invalid body",
@@ -71,21 +142,44 @@ async function setupAPI() {
             );
           }
 
-          await scan(serviceName, body.data.ean);
+          logger.debug(
+            `[${serviceName}] Received correct JSON Body for scan: ${JSON.stringify(
+              body.data
+            )}`
+          );
 
-          return Response.json({
-            message: "Successfully added EAN to destination list",
-          });
+          logger.info(`[${serviceName}] Processing EAN ${body.data.ean}`);
+
+          const success = await processScannedEAN(serviceName, body.data.ean);
+
+          if (success) {
+            logger.debug(`[${serviceName}] Correctly processed EAN`);
+            return Response.json({
+              message: "Successfully added EAN to destination list",
+            });
+          } else {
+            logger.debug(
+              `[${serviceName}] Could not process EAN, probably is not known`
+            );
+            return Response.json({
+              message:
+                "Could not add EAN, but user will be asked via bot to add product manually",
+            });
+          }
         },
       },
     },
   });
 
-  console.log("Successfully started API server");
+  logger.debug("Successfully started API server");
 }
 
 // This function should be called when an ean is scanned for a specific service
-async function scan(serviceName: string, ean: string) {
+async function processScannedEAN(serviceName: string, ean: string) {
+  if (!validateEAN(ean)) {
+    throw new Error(`Invalid EAN ${ean}`);
+  }
+
   const serviceConfig = getServiceConfig(serviceName);
 
   // Get all necessary configs for this service
@@ -93,13 +187,12 @@ async function scan(serviceName: string, ean: string) {
   const botConfig = serviceConfig.bot;
 
   // Get all necessary adapters for this service with their services configs
-  const sourceAdapter = getAdapter<SourceAdapter<AdapterBaseConfig>>(
-    sourceConfig.adapterName,
-    "source"
-  );
-  const botAdapter = getAdapter<BotAdapter<AdapterBaseConfig>>(
-    botConfig.adapterName,
-    "bot"
+  const sourceAdapter = await getAdapter<
+    SourceAdapter<SourceAdapterBaseConfig>
+  >("source", serviceConfig);
+  const botAdapter = await getAdapter<BotAdapter<BotAdapterBaseConfig>>(
+    "bot",
+    serviceConfig
   );
 
   // Calculate ttl expiration date for this source adapter
@@ -129,6 +222,11 @@ async function scan(serviceName: string, ean: string) {
   if (cachedProduct.length > 0) {
     // Found cached product, return early
     const product = cachedProduct[0]!;
+    logger.debug(
+      `[${
+        serviceConfig.serviceName
+      }] Found cached product for EAN ${ean}: ${JSON.stringify(product)}`
+    );
     return await addProduct(
       {
         ean: product.ean,
@@ -140,47 +238,80 @@ async function scan(serviceName: string, ean: string) {
     );
   }
 
-  // Now try to get the EAN from source adapter
-  const product = await sourceAdapter.find(ean, sourceConfig);
+  try {
+    // Now try to get the EAN from source adapter
+    const product = await sourceAdapter.find(ean, sourceConfig);
 
-  // If product is found, add product immediately and return early
-  if (product !== null) {
-    await updateCache(product, false, serviceConfig);
-    return await addProduct(product, serviceConfig);
+    // If product is found, add product immediately and return early
+    if (product !== null) {
+      logger.debug(
+        `[${
+          serviceConfig.serviceName
+        }] Received product for EAN ${ean} from Source Adapter: ${JSON.stringify(
+          product
+        )}`
+      );
+      await updateCache(product, false, serviceConfig);
+      return await addProduct(product, serviceConfig);
+    }
+  } catch (err) {
+    if (err instanceof Error) {
+      logger.error(err);
+    }
+    throw err;
   }
 
   // Product was not found in database, ask user to add product
+  logger.info(
+    `Did not find a product for EAN ${ean} in Cache or Source Adapter. Asking user via Bot to add product manually.`
+  );
   await botAdapter.sendMessage(
-    `😢 I couldn't find the EAN ${ean}. Please add it via \`/add ${serviceName} ${ean} <ProductName> <Brand> <Extra>\``,
+    `😢 I couldn't find a product with EAN ${ean}. Please add it manually once via command ${botAdapter.getAddCommandExample(
+      ean
+    )}`,
     botConfig
   );
+
+  return false;
 }
 
-async function addProduct(product: Product, serviceConfig: ServiceConfig) {
+async function addProduct(
+  product: Product,
+  serviceConfig: ServiceConfig
+): Promise<boolean> {
   // Get list adapter for this service
   const listConfig = serviceConfig.list;
   const botConfig = serviceConfig.bot;
-  const listAdapter = getAdapter<ListAdapter<AdapterBaseConfig>>(
-    listConfig.adapterName,
-    "list"
+  const listAdapter = await getAdapter<ListAdapter<ListAdapterBaseConfig>>(
+    "list",
+    serviceConfig
   );
-  const botAdapter = getAdapter<BotAdapter<AdapterBaseConfig>>(
-    botConfig.adapterName,
-    "bot"
+  const botAdapter = await getAdapter<BotAdapter<BotAdapterBaseConfig>>(
+    "bot",
+    serviceConfig
   );
 
-  if (await listAdapter.hasProduct(product.ean, listConfig)) {
+  if (await listAdapter.hasProduct(product, listConfig)) {
     // Skip adding product as it's already on the list
-    return;
+    logger.info(
+      `[${serviceConfig.serviceName}] Skipping adding product with EAN ${product.ean} to list "${listConfig.adapterName}" because it exists on this list.`
+    );
+    return true;
   }
 
   // Add the product to the list adapter
   await listAdapter.addProduct(product, listConfig);
 
+  logger.info(
+    `[${serviceConfig.serviceName}] Successfully added product with EAN ${product.ean} to list "${listConfig.adapterName}".`
+  );
+
   await botAdapter.sendMessage(
     `${product.name} was added to your shopping list 🛒`,
     botConfig
   );
+
+  return true;
 }
 
 async function updateCache(
