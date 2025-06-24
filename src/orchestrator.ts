@@ -9,6 +9,7 @@ import type { Product } from "./product";
 import { eanCache } from "./schema";
 import type { SourceAdapter } from "./sourceAdapters/interface";
 import { checkToken } from "./authentication";
+import z from "zod/v4";
 
 export async function setup() {
   // Call setup function for all bots defined in all services
@@ -38,6 +39,10 @@ async function setupBots(service: ServiceConfig) {
 }
 
 async function setupAPI(service: ServiceConfig) {
+  const scanBodySchema = z.object({
+    ean: z.string(),
+  });
+
   Bun.serve({
     routes: {
       "/api/v1/service/:serviceName/scan": {
@@ -45,11 +50,26 @@ async function setupAPI(service: ServiceConfig) {
           const serviceName = req.params.serviceName;
 
           if (!checkToken(serviceName, req)) {
-            return Response.json({ message: "Invalid token" }, { status: 403 });
+            return Response.json({ message: "Invalid auth" }, { status: 403 });
           }
 
-          const body = await req.json();
-          return Response.json({ created: true });
+          const body = await scanBodySchema.safeParseAsync(await req.json());
+
+          if (!body.success) {
+            return Response.json(
+              {
+                message: "Invalid body",
+                error: z.treeifyError(body.error),
+              },
+              { status: 400 }
+            );
+          }
+
+          await scan(serviceName, body.data.ean);
+
+          return Response.json({
+            message: "Successfully added EAN to destination list",
+          });
         },
       },
     },
@@ -57,7 +77,7 @@ async function setupAPI(service: ServiceConfig) {
 }
 
 // This function should be called when an ean is scanned for a specific service
-export async function scan(serviceName: string, ean: string) {
+async function scan(serviceName: string, ean: string) {
   const serviceConfig = getServiceConfig(serviceName);
 
   // Get all necessary configs for this service
