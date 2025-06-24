@@ -13,7 +13,7 @@ jobs:
         with:
           # list of Docker images to use as base name for tags
           images: |
-            nicoenking/ean-list-bridge
+            ${{ vars.DOCKERHUB_REPOSITORY }}
           # generate Docker tags based on the following events/attributes
           tags: |
             type=schedule
@@ -39,3 +39,9 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+      - name: Docker Hub Description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ vars.DOCKERHUB_REPOSITORY }}
