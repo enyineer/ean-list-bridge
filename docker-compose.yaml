@@ -1,0 +1,12 @@
+version: "3.8"
+
+services:
+  ean-list-bridge:
+    image: nicoenking/ean-list-bridge:main
+    container_name: ean-list-bridge
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./database:/usr/src/app/database
+      - ./config:/usr/src/app/config
+    restart: unless-stopped
