@@ -21,11 +21,15 @@ async function addAdapter(path: string, registry: AdapterRegistry) {
 
   const adapterName = instance.getAdapterName();
 
+  console.log(`Registering adapter ${adapterName} (${path})...`);
+
   if (Object.hasOwn(registry, adapterName)) {
-    throw new Error(`Duplicate adapter name ${adapterName}.`);
+    throw new Error(`Duplicate adapter name ${adapterName} (${path}).`);
   }
 
   registry[adapterName] = instance;
+
+  console.log(`Successfully registered adapter ${adapterName} ${path}`);
 }
 
 // Scan listAdapters for all adapters

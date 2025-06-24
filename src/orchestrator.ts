@@ -46,7 +46,10 @@ async function setupAPI() {
     ean: z.string(),
   });
 
+  console.log("Starting API server...");
+
   Bun.serve({
+    port: 3000,
     routes: {
       "/api/v1/service/:serviceName/scan": {
         POST: async (req) => {
@@ -77,6 +80,8 @@ async function setupAPI() {
       },
     },
   });
+
+  console.log("Successfully started API server");
 }
 
 // This function should be called when an ean is scanned for a specific service
