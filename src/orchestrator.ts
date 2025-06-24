@@ -84,16 +84,11 @@ async function scan(serviceName: string, ean: string) {
 
   // Get all necessary configs for this service
   const sourceConfig = serviceConfig.source;
-  const botConfig = serviceConfig.bot;
 
   // Get all necessary adapters for this service with their services configs
   const sourceAdapter = getAdapter<SourceAdapter<AdapterBaseConfig>>(
     sourceConfig.adapterName,
     "source"
-  );
-  const botAdapter = getAdapter<BotAdapter<AdapterBaseConfig>>(
-    botConfig.adapterName,
-    "bot"
   );
 
   // Calculate ttl expiration date for this source adapter
@@ -147,13 +142,25 @@ async function scan(serviceName: string, ean: string) {
 async function addProduct(product: Product, serviceConfig: ServiceConfig) {
   // Get list adapter for this service
   const listConfig = serviceConfig.list;
+  const botConfig = serviceConfig.bot;
   const listAdapter = getAdapter<ListAdapter<AdapterBaseConfig>>(
     listConfig.adapterName,
     "list"
   );
+  const botAdapter = getAdapter<BotAdapter<AdapterBaseConfig>>(
+    botConfig.adapterName,
+    "bot"
+  );
+
+  if (await listAdapter.hasProduct(product.ean, listConfig)) {
+    // Skip adding product as it's already on the list
+    return;
+  }
 
   // Add the product to the list adapter
-  await listAdapter.add(product, listConfig);
+  await listAdapter.addProduct(product, listConfig);
+
+  // TODO: Notify via bot about added product
 }
 
 async function updateCache(

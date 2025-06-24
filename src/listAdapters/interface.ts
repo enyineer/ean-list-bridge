@@ -3,5 +3,6 @@ import type { Product } from "../product";
 
 export interface ListAdapter<C extends AdapterBaseConfig>
   extends AdapterBase<C> {
-  add(product: Product, adapterConfig: C): Promise<void>;
+  addProduct(product: Product, adapterConfig: C): Promise<void>;
+  hasProduct(ean: string, adapterConfig: C): Promise<boolean>;
 }

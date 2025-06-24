@@ -20,7 +20,13 @@ class BringAdapter implements ListAdapter<BringAdapterConfig> {
   getConfigDataSchema() {
     return bringAdapterConfigSchema;
   }
-  add(product: Product, adapterConfig: BringAdapterConfig): Promise<void> {
+  addProduct(
+    product: Product,
+    adapterConfig: BringAdapterConfig
+  ): Promise<void> {
+    throw new Error("Method not implemented.");
+  }
+  hasProduct(ean: string, adapterConfig: BringAdapterConfig): Promise<boolean> {
     throw new Error("Method not implemented.");
   }
 }
