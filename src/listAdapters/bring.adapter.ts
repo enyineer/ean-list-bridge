@@ -3,13 +3,11 @@ import type { Product } from "../product";
 import { type ListAdapter } from "./interface";
 import { z } from "zod/v4";
 
-const bringAdapterConfigSchema = adapterBaseConfigSchema.extend(
-  z.object({
-    username: z.string(),
-    password: z.string(),
-    listId: z.string(),
-  })
-);
+const bringAdapterConfigSchema = adapterBaseConfigSchema.extend({
+  username: z.string(),
+  password: z.string(),
+  listId: z.string(),
+});
 
 type BringAdapterConfig = z.infer<typeof bringAdapterConfigSchema>;
 

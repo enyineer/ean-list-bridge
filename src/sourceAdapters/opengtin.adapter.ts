@@ -3,11 +3,9 @@ import type { Product } from "../product";
 import { type SourceAdapter } from "./interface";
 import { z } from "zod/v4";
 
-const opengtinAdapterConfigSchema = adapterBaseConfigSchema.extend(
-  z.object({
-    userid: z.string(),
-  })
-);
+const opengtinAdapterConfigSchema = adapterBaseConfigSchema.extend({
+  userid: z.string(),
+});
 
 type OpengtinAdapterConfig = z.infer<typeof opengtinAdapterConfigSchema>;
 

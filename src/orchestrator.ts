@@ -38,6 +38,7 @@ async function setupBots(service: ServiceConfig) {
   );
 
   // TODO: Add listeners for incoming updates and add product + update cache as manual item
+  // TODO: Make sure to check if the originating chat is equal to the chat configured for the services bot adapter
 }
 
 async function setupAPI() {
@@ -84,11 +85,16 @@ async function scan(serviceName: string, ean: string) {
 
   // Get all necessary configs for this service
   const sourceConfig = serviceConfig.source;
+  const botConfig = serviceConfig.bot;
 
   // Get all necessary adapters for this service with their services configs
   const sourceAdapter = getAdapter<SourceAdapter<AdapterBaseConfig>>(
     sourceConfig.adapterName,
     "source"
+  );
+  const botAdapter = getAdapter<BotAdapter<AdapterBaseConfig>>(
+    botConfig.adapterName,
+    "bot"
   );
 
   // Calculate ttl expiration date for this source adapter
@@ -137,6 +143,12 @@ async function scan(serviceName: string, ean: string) {
     await updateCache(product, false, serviceConfig);
     return await addProduct(product, serviceConfig);
   }
+
+  // Product was not found in database, ask user to add product
+  await botAdapter.sendMessage(
+    `😢 I couldn't find the EAN ${ean}. Please add it via \`/add ${serviceName} ${ean} <ProductName> <Brand> <Extra>`,
+    botConfig
+  );
 }
 
 async function addProduct(product: Product, serviceConfig: ServiceConfig) {
@@ -160,7 +172,10 @@ async function addProduct(product: Product, serviceConfig: ServiceConfig) {
   // Add the product to the list adapter
   await listAdapter.addProduct(product, listConfig);
 
-  // TODO: Notify via bot about added product
+  await botAdapter.sendMessage(
+    `${product.name} was added to your shopping list 🛒`,
+    botConfig
+  );
 }
 
 async function updateCache(
