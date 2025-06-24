@@ -146,7 +146,7 @@ async function scan(serviceName: string, ean: string) {
 
   // Product was not found in database, ask user to add product
   await botAdapter.sendMessage(
-    `😢 I couldn't find the EAN ${ean}. Please add it via \`/add ${serviceName} ${ean} <ProductName> <Brand> <Extra>`,
+    `😢 I couldn't find the EAN ${ean}. Please add it via \`/add ${serviceName} ${ean} <ProductName> <Brand> <Extra>\``,
     botConfig
   );
 }
