@@ -37,18 +37,31 @@ There might be new Adapters in the future. Please see the README of the adapter 
 ### Bot Adapters
 - [Telegram](./src/adapters/bot/telegram/README.md)
 
-# ESP32 EAN Scanner
+## Docker
+
+This repository contains a Dockerfile for you to build this application locally and start it as a Docker Container without needing to install Bun.
+
+
+### Create Image
+
+`$ docker build --pull -t ean-list-brige:latest .`
+
+### Run Image
+
+`$ docker run --rm -p 3000:3000 -v $PWD/config/config.json:/usr/src/app/config/config.json ean-list-brige:latest`
+
+## ESP32 EAN Scanner
 
 Want to build your own scanner to just scan empty packages and automatically add them to your shopping list? Just put it near to your trash bin and you'll never have to add products again manually (if the EAN is known to the selected EAN-Database provider).
 
-## Components
+### Components
 
 - ESP32 (Whichever you like, I recommend a simple ESP32 Dev Module like the ESP32-WROOM)
 - GM861 Barcode Scanner
 
 You can get these components for under 20€ at AliExpress!
 
-### How-To
+#### How-To
 
 1. Connect your GM861 Module to your ESP32 (I use 3.3v, GND and GPIO16)
 2. Install ESPHome on your ESP32. [Install EPSHome in HomeAssistant](https://esphome.io/guides/getting_started_hassio.html) / [Install ESPHome in Standalone Mode](https://esphome.io/guides/installing_esphome.html)
