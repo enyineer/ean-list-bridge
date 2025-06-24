@@ -12,6 +12,8 @@ import { checkToken } from "./authentication";
 import z from "zod/v4";
 
 export async function setup() {
+  // Setup API
+  await setupAPI();
   // Call setup function for all bots defined in all services
   for (const service of config.services) {
     await setupBots(service);
@@ -38,7 +40,7 @@ async function setupBots(service: ServiceConfig) {
   // TODO: Add listeners for incoming updates and add product + update cache as manual item
 }
 
-async function setupAPI(service: ServiceConfig) {
+async function setupAPI() {
   const scanBodySchema = z.object({
     ean: z.string(),
   });
